@@ -2273,6 +2273,8 @@ static void select_properties_response(const char *input, void *user_data)
 	p = endpoint_find_codec_preset(ep, input);
 	if (p) {
 		reply = endpoint_select_properties_reply(ep, ep->msg, p);
+		if (reply)
+			ep->codec_preset = p;
 		goto done;
 	}
 
@@ -2324,6 +2326,49 @@ static DBusMessage *endpoint_select_properties(DBusConnection *conn,
 	 * SetConfiguration.
 	 */
 	ep->auto_acquire = auto_acquire;
+
+	return reply;
+}
+
+static DBusMessage *endpoint_select_qos(DBusConnection *conn,
+					DBusMessage *msg, void *user_data)
+{
+	struct endpoint *ep = user_data;
+	struct codec_preset *preset = ep->codec_preset;
+	DBusMessageIter args;
+	DBusMessageIter iter, dict;
+	DBusMessage *reply;
+	struct endpoint_config cfg;
+
+	dbus_message_iter_init(msg, &args);
+
+	bt_shell_printf("Endpoint: SelectQoS\n");
+	print_iter("\t", "Properties", &args);
+
+	if (!preset)
+		return g_dbus_create_error(msg, "org.bluez.Error.Rejected",
+						"No previous codec preset");
+
+	reply = dbus_message_new_method_return(msg);
+	if (!reply)
+		return NULL;
+
+	dbus_message_iter_init_append(reply, &iter);
+
+	dbus_message_iter_open_container(&iter, DBUS_TYPE_ARRAY, "{sv}", &dict);
+
+	/* TODO: we ignore BAP Server supported values here. If they are not
+	 * suitable for the preset, we should prompt for a preset again, and
+	 * call SetConfiguration on the remote endpoint with the new
+	 * configuration to retry.
+	 */
+
+	memset(&cfg, 0, sizeof(cfg));
+	cfg.ep = ep;
+	cfg.qos = preset->qos;
+	append_qos(&dict, &cfg);
+
+	dbus_message_iter_close_container(&iter, &dict);
 
 	return reply;
 }
@@ -3053,6 +3098,10 @@ static const GDBusMethodTable endpoint_methods[] = {
 					GDBUS_ARGS({ "properties", "a{sv}" } ),
 					GDBUS_ARGS({ "properties", "a{sv}" } ),
 					endpoint_select_properties) },
+	{ GDBUS_ASYNC_METHOD("SelectQoS",
+					GDBUS_ARGS({ "properties", "a{sv}" } ),
+					GDBUS_ARGS({ "properties", "a{sv}" } ),
+					endpoint_select_qos) },
 	{ GDBUS_ASYNC_METHOD("ClearConfiguration",
 					GDBUS_ARGS({ "transport", "o" } ),
 					NULL, endpoint_clear_configuration) },
