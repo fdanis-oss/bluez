@@ -107,6 +107,8 @@ Returns a configuration which can be used to setup a transport, see
 Note: There is no need to cache the selected configuration since on success the
 configuration is send back as parameter of SetConfiguration.
 
+.. _SelectProperties:
+
 dict SelectProperties(dict capabilities)
 ````````````````````````````````````````
 
@@ -122,7 +124,56 @@ Select BAP unicast configuration from the supported capabilities:
 
 :uint32_t ChannelAllocation:
 
+See `MediaEndpoint Properties`_ for their possible values.
+
+Returns a configuration which can be used to setup a transport:
+
+:array{byte} Capabilities:
+
+	See **org.bluez.MediaTransport(5)**.
+
+:array{byte} Metadata [optional]:
+
+	See **org.bluez.MediaTransport(5)**.
+
 :dict QoS:
+
+	See **org.bluez.MediaTransport(5)**.
+
+	The following fields shall be provided:
+
+	:byte TargetLatency:
+	:byte PHY:
+
+	If `SelectQoS`_ is not implemented, then values for all other ``QoS``
+	fields are also determined by the value returned here.
+
+Note: There is no need to cache the selected properties since on success the
+configuration is sent back as parameter of `SetConfiguration`_ and
+`SelectQoS`_.
+
+.. _SelectQoS:
+
+dict SelectQoS(dict configuration)
+``````````````````````````````````
+
+Select BAP unicast QoS to be used for a transport, based on
+server capabilities and selected configuration.
+
+:object Endpoint:
+
+:array{byte} Capabilities:
+
+	The configuration, as returned by `SelectProperties`_.
+
+:array{byte} Metadata [optional]:
+
+	The metadata, as returned by `SelectProperties`_.
+
+:dict QoS:
+
+	Server endpoint supported and preferred values.	 See
+	`MediaEndpoint Properties`_ for their possible values.
 
 	:byte Framing:
 	:byte PHY:
@@ -132,18 +183,16 @@ Select BAP unicast configuration from the supported capabilities:
 	:uint32 PreferredMinimumDelay:
 	:uint32 PreferredMaximumDelay:
 
-See `MediaEndpoint Properties`_ for their possible values.
+Returns a QoS configuration which can be used to setup a transport:
 
-Returns a configuration which can be used to setup a transport:
-
-:array{byte} Capabilities:
-:array{byte} Metadata [optional]:
 :dict QoS:
 
-See `SetConfiguration`_ for their possible values.
+	See **org.bluez.MediaTransport(5)** QoS property for
+	possible values.
 
-Note: There is no need to cache the selected properties since on success the
-configuration is send back as parameter of SetConfiguration.
+Note: There is no need to cache the selected properties since
+on success the configuration is sent back as parameter of
+`SetConfiguration`_.
 
 void ClearConfiguration(object transport)
 `````````````````````````````````````````
