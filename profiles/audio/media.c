@@ -795,7 +795,7 @@ static bool endpoint_init_a2dp_sink(struct media_endpoint *endpoint, int *err)
 
 struct pac_select_data {
 	struct bt_bap_pac *pac;
-	bt_bap_pac_select_t cb;
+	bt_bap_pac_select_codec_t cb;
 	void *user_data;
 };
 
@@ -988,9 +988,9 @@ done:
 	data->cb(data->pac, err, &caps, &meta, &qos, data->user_data);
 }
 
-static int pac_select(struct bt_bap_pac *lpac, struct bt_bap_pac *rpac,
-			uint32_t location, struct bt_bap_pac_qos *qos,
-			bt_bap_pac_select_t cb, void *cb_data, void *user_data)
+static int pac_select_codec(struct bt_bap_pac *lpac, struct bt_bap_pac *rpac,
+			uint32_t location, bt_bap_pac_select_codec_t cb, void *cb_data,
+			void *user_data)
 {
 	struct media_endpoint *endpoint = user_data;
 	struct iovec *caps;
@@ -1049,47 +1049,6 @@ static int pac_select(struct bt_bap_pac *lpac, struct bt_bap_pac *rpac,
 						metadata->iov_len);
 	}
 
-	if (qos && qos->phys) {
-		DBusMessageIter entry, variant, qos_dict;
-
-		key = "QoS";
-		dbus_message_iter_open_container(&dict, DBUS_TYPE_DICT_ENTRY,
-								NULL, &entry);
-		dbus_message_iter_append_basic(&entry, DBUS_TYPE_STRING, &key);
-		dbus_message_iter_open_container(&entry, DBUS_TYPE_VARIANT,
-							"a{sv}", &variant);
-		dbus_message_iter_open_container(&variant, DBUS_TYPE_ARRAY,
-							"{sv}", &qos_dict);
-
-		g_dbus_dict_append_entry(&qos_dict, "Framing", DBUS_TYPE_BYTE,
-							&qos->framing);
-
-		g_dbus_dict_append_entry(&qos_dict, "PHY", DBUS_TYPE_BYTE,
-							&qos->phys);
-
-		g_dbus_dict_append_entry(&qos_dict, "Retransmissions",
-					DBUS_TYPE_BYTE, &qos->rtn);
-
-		g_dbus_dict_append_entry(&qos_dict, "MaximumLatency",
-					DBUS_TYPE_UINT16, &qos->latency);
-
-		g_dbus_dict_append_entry(&qos_dict, "MinimumDelay",
-					DBUS_TYPE_UINT32, &qos->pd_min);
-
-		g_dbus_dict_append_entry(&qos_dict, "MaximumDelay",
-					DBUS_TYPE_UINT32, &qos->pd_max);
-
-		g_dbus_dict_append_entry(&qos_dict, "PreferredMinimumDelay",
-					DBUS_TYPE_UINT32, &qos->ppd_min);
-
-		g_dbus_dict_append_entry(&qos_dict, "PreferredMaximumDelay",
-					DBUS_TYPE_UINT32, &qos->ppd_max);
-
-		dbus_message_iter_close_container(&variant, &qos_dict);
-		dbus_message_iter_close_container(&entry, &variant);
-		dbus_message_iter_close_container(&dict, &entry);
-	}
-
 	dbus_message_iter_close_container(&iter, &dict);
 
 	if (!media_endpoint_async_call(msg, endpoint, NULL, pac_select_cb,
@@ -1099,7 +1058,8 @@ static int pac_select(struct bt_bap_pac *lpac, struct bt_bap_pac *rpac,
 	return 0;
 }
 
-static void pac_cancel_select(struct bt_bap_pac *lpac, bt_bap_pac_select_t cb,
+static void pac_cancel_select_codec(struct bt_bap_pac *lpac,
+						bt_bap_pac_select_codec_t cb,
 						void *cb_data, void *user_data)
 {
 	struct media_endpoint *endpoint = user_data;
@@ -1298,8 +1258,8 @@ static void pac_clear(struct bt_bap_stream *stream, void *user_data)
 }
 
 static struct bt_bap_pac_ops pac_ops = {
-	.select = pac_select,
-	.cancel_select = pac_cancel_select,
+	.select_codec = pac_select_codec,
+	.cancel_select_codec = pac_cancel_select_codec,
 	.config = pac_config,
 	.clear = pac_clear,
 };

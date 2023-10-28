@@ -23,12 +23,15 @@ typedef void (*bt_bap_pac_func_t)(struct bt_bap_pac *pac, void *user_data);
 typedef bool (*bt_bap_pac_foreach_t)(struct bt_bap_pac *lpac,
 					struct bt_bap_pac *rpac,
 					void *user_data);
-typedef void (*bt_bap_pac_select_t)(struct bt_bap_pac *pac, int err,
+typedef void (*bt_bap_pac_select_codec_t)(struct bt_bap_pac *pac, int err,
 					struct iovec *caps,
 					struct iovec *metadata,
 					struct bt_bap_qos *qos,
 					void *user_data);
 typedef void (*bt_bap_pac_config_t)(struct bt_bap_stream *stream, int err);
+typedef void (*bt_bap_pac_select_qos_t)(struct bt_bap_stream *stream,
+					int err, struct bt_bap_qos *qos,
+					void *user_data);
 typedef void (*bt_bap_state_func_t)(struct bt_bap_stream *stream,
 					uint8_t old_state, uint8_t new_state,
 					void *user_data);
@@ -81,11 +84,16 @@ struct bt_bap_pac *bt_bap_add_pac(struct gatt_db *db, const char *name,
 					struct iovec *metadata);
 
 struct bt_bap_pac_ops {
-	int (*select)(struct bt_bap_pac *lpac, struct bt_bap_pac *rpac,
-			uint32_t chan_alloc, struct bt_bap_pac_qos *qos,
-			bt_bap_pac_select_t cb, void *cb_data, void *user_data);
-	void (*cancel_select)(struct bt_bap_pac *lpac,
-			bt_bap_pac_select_t cb, void *cb_data, void *user_data);
+	int (*select_codec)(struct bt_bap_pac *lpac, struct bt_bap_pac *rpac,
+			uint32_t chan_alloc, bt_bap_pac_select_codec_t cb,
+			void *cb_data, void *user_data);
+	void (*cancel_select_codec)(struct bt_bap_pac *lpac,
+			bt_bap_pac_select_codec_t cb, void *cb_data, void *user_data);
+	int (*select_qos)(struct bt_bap_stream *stream,
+			struct bt_bap_pac_qos *qos, bt_bap_pac_select_qos_t cb,
+			void *cb_data, void *user_data);
+	void (*cancel_select_qos)(struct bt_bap_pac *lpac,
+			bt_bap_pac_select_qos_t cb, void *cb_data, void *user_data);
 	int (*config)(struct bt_bap_stream *stream, struct iovec *cfg,
 			struct bt_bap_qos *qos, bt_bap_pac_config_t cb,
 			void *user_data);
@@ -172,13 +180,14 @@ void bt_bap_pac_set_user_data(struct bt_bap_pac *pac, void *user_data);
 void *bt_bap_pac_get_user_data(struct bt_bap_pac *pac);
 
 /* Stream related functions */
-int bt_bap_select(struct bt_bap *bap,
+int bt_bap_select_codec(struct bt_bap *bap,
 			struct bt_bap_pac *lpac, struct bt_bap_pac *rpac,
 			unsigned int max_channels, int *count,
-			bt_bap_pac_select_t func, void *user_data);
+			bt_bap_pac_select_codec_t func, void *user_data);
 
-void bt_bap_cancel_select(struct bt_bap_pac *lpac, bt_bap_pac_select_t func,
-			void *user_data);
+void bt_bap_cancel_select_codec(struct bt_bap_pac *lpac,
+				bt_bap_pac_select_codec_t func,
+				void *user_data);
 
 struct bt_bap_stream *bt_bap_stream_new(struct bt_bap *bap,
 					struct bt_bap_pac *lpac,
@@ -195,6 +204,12 @@ uint8_t bt_bap_stream_get_state(struct bt_bap_stream *stream);
 bool bt_bap_stream_set_user_data(struct bt_bap_stream *stream, void *user_data);
 
 void *bt_bap_stream_get_user_data(struct bt_bap_stream *stream);
+
+int bt_bap_stream_select_qos(struct bt_bap_stream *stream,
+				bt_bap_pac_select_qos_t func, void *user_data);
+
+void bt_bap_cancel_select_qos(struct bt_bap_pac *lpac,
+				bt_bap_pac_select_qos_t func, void *user_data);
 
 unsigned int bt_bap_stream_config(struct bt_bap_stream *stream,
 					struct bt_bap_qos *pqos,
@@ -240,6 +255,8 @@ uint32_t bt_bap_stream_get_location(struct bt_bap_stream *stream);
 struct iovec *bt_bap_stream_get_config(struct bt_bap_stream *stream);
 struct bt_bap_qos *bt_bap_stream_get_qos(struct bt_bap_stream *stream);
 struct iovec *bt_bap_stream_get_metadata(struct bt_bap_stream *stream);
+struct bt_bap_pac *bt_bap_stream_get_lpac(struct bt_bap_stream *stream);
+struct bt_bap_pac *bt_bap_stream_get_rpac(struct bt_bap_stream *stream);
 
 struct io *bt_bap_stream_get_io(struct bt_bap_stream *stream);
 bool bt_bap_match_bcast_sink_stream(const void *data, const void *user_data);

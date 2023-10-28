@@ -9911,7 +9911,7 @@ static void streaming_ucl_state(struct bt_bap_stream *stream,
 	}
 }
 
-static void test_select_cb(struct bt_bap_pac *pac, int err,
+static void test_select_codec_cb(struct bt_bap_pac *pac, int err,
 			struct iovec *caps, struct iovec *metadata,
 			struct bt_bap_qos *qos, void *user_data)
 {
@@ -9965,8 +9965,8 @@ static bool test_select_pac(struct bt_bap_pac *lpac, struct bt_bap_pac *rpac,
 
 	sdata->rpac = rpac;
 
-	err = bt_bap_select(sdata->data->bap, lpac, rpac, cfg->streams, &count,
-							test_select_cb, sdata);
+	err = bt_bap_select_codec(sdata->data->bap, lpac, rpac, cfg->streams,
+					&count, test_select_codec_cb, sdata);
 	if (err)
 		tester_test_failed();
 
@@ -10010,9 +10010,9 @@ static void bap_select_ready(struct bt_bap *bap, void *user_data)
 		tester_test_passed();
 }
 
-static int pac_select(struct bt_bap_pac *lpac, struct bt_bap_pac *rpac,
-			uint32_t location, struct bt_bap_pac_qos *qos,
-			bt_bap_pac_select_t cb, void *cb_data, void *user_data)
+static int pac_select_codec(struct bt_bap_pac *lpac, struct bt_bap_pac *rpac,
+			uint32_t location, bt_bap_pac_select_codec_t cb,
+			void *cb_data, void *user_data)
 {
 	struct test_select_data *sdata = cb_data;
 	struct test_data *data = sdata->data;
@@ -10050,7 +10050,7 @@ static int pac_select(struct bt_bap_pac *lpac, struct bt_bap_pac *rpac,
 }
 
 static struct bt_bap_pac_ops test_select_pac_ops = {
-	.select = pac_select,
+	.select_codec = pac_select_codec,
 };
 
 static void test_select(const void *user_data)

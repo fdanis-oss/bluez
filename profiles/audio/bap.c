@@ -1965,7 +1965,7 @@ static void bap_select_complete(struct bap_select *select)
 	bap_config_setup_cb(NULL, 0, 0, select);
 }
 
-static void select_cb(struct bt_bap_pac *pac, int err, struct iovec *caps,
+static void select_codec_cb(struct bt_bap_pac *pac, int err, struct iovec *caps,
 				struct iovec *metadata, struct bt_bap_qos *qos,
 				void *user_data)
 {
@@ -2030,8 +2030,8 @@ static bool pac_select(struct bt_bap_pac *lpac, struct bt_bap_pac *rpac,
 		queue_push_tail(select->eps, ep);
 	}
 
-	bt_bap_select(data->bap, lpac, rpac, 0, &select->remaining,
-								select_cb, ep);
+	bt_bap_select_codec(data->bap, lpac, rpac, 0, &select->remaining,
+								select_codec_cb, ep);
 
 	/* For initial configuration consider only one endpoint (for each
 	 * direction).
@@ -2080,12 +2080,13 @@ static bool pac_register(struct bt_bap_pac *lpac, struct bt_bap_pac *rpac,
 	return true;
 }
 
-static bool pac_cancel_select(struct bt_bap_pac *lpac, struct bt_bap_pac *rpac,
-							void *user_data)
+static bool pac_cancel_select_codec(struct bt_bap_pac *lpac,
+						struct bt_bap_pac *rpac,
+						void *user_data)
 {
 	struct bap_ep *ep = user_data;
 
-	bt_bap_cancel_select(lpac, select_cb, ep);
+	bt_bap_cancel_select_codec(lpac, select_codec_cb, ep);
 
 	return true;
 }
@@ -2095,8 +2096,8 @@ static void ep_cancel_select(struct bap_ep *ep)
 	struct bt_bap *bap = ep->data->bap;
 	struct bap_select *select;
 
-	bt_bap_foreach_pac(bap, BT_BAP_SOURCE, pac_cancel_select, ep);
-	bt_bap_foreach_pac(bap, BT_BAP_SINK, pac_cancel_select, ep);
+	bt_bap_foreach_pac(bap, BT_BAP_SOURCE, pac_cancel_select_codec, ep);
+	bt_bap_foreach_pac(bap, BT_BAP_SINK, pac_cancel_select_codec, ep);
 
 	select = ep->select;
 	if (select) {
