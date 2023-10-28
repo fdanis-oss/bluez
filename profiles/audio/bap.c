@@ -860,10 +860,37 @@ static void qos_cb(struct bt_bap_stream *stream, uint8_t code, uint8_t reason,
 
 	setup->id = 0;
 
-	if (code)
-		setup_ready(setup, code, reason);
+	setup_ready(setup, code, reason);
+}
 
-	bap_update_cigs(setup->ep->data);
+static void select_qos_cb(struct bt_bap_stream *stream, int err,
+					struct bt_bap_qos *qos, void *user_data)
+{
+	struct bap_setup *setup = user_data;
+
+	DBG("stream %p err %d qos %p", stream, err, qos);
+
+	if (err || setup->id)
+		goto fail;
+
+	if (qos)
+		setup->qos = *qos;
+
+	setup_create_io(setup->ep->data, setup, stream, true);
+	if (!setup->io) {
+		error("Unable to create io");
+		goto fail;
+	}
+
+	setup->id = bt_bap_stream_qos(stream, &setup->qos, qos_cb, setup);
+	if (!setup->id)
+		goto fail;
+
+	return;
+
+fail:
+	error("Failed to Configure QoS");
+	setup_ready(setup, -EIO, 0);
 }
 
 static int setup_qos(struct bap_setup *setup)
@@ -887,8 +914,7 @@ static int setup_qos(struct bap_setup *setup)
 	}
 
 	/* Wait QoS response to respond */
-	setup->id = bt_bap_stream_qos(stream, &setup->qos, qos_cb, setup);
-	if (!setup->id) {
+	if (bt_bap_stream_select_qos(stream, select_qos_cb, setup)) {
 		error("Failed to Configure QoS");
 		goto error;
 	}

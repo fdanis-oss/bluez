@@ -148,6 +148,7 @@ struct local_player {
 	char			*status;
 	uint32_t		position;
 	uint32_t		duration;
+	int8_t			volume;
 	GTimer			*timer;
 	bool			play;
 	bool			pause;
@@ -395,6 +396,19 @@ static void endpoint_reply(DBusPendingCall *call, void *user_data)
 
 	dbus_error_init(&err);
 	if (dbus_set_error_from_message(&err, reply)) {
+		/* Endpoint is not required to implement SelectQoS */
+		if (dbus_error_has_name(&err, DBUS_ERROR_UNKNOWN_METHOD) &&
+		    dbus_message_is_method_call(request->msg,
+				    MEDIA_ENDPOINT_INTERFACE, "SelectQoS")) {
+			bool value;
+
+			dbus_error_free(&err);
+			value = FALSE;
+			size = sizeof(value);
+			ret = &value;
+			goto done;
+		}
+
 		error("Endpoint replied with an error: %s",
 				err.name);
 
@@ -436,6 +450,13 @@ static void endpoint_reply(DBusPendingCall *call, void *user_data)
 	} else if (dbus_message_is_method_call(request->msg,
 						MEDIA_ENDPOINT_INTERFACE,
 						"SelectProperties")) {
+		dbus_message_iter_init(reply, &args);
+		dbus_message_iter_recurse(&args, &props);
+		ret = &props;
+		goto done;
+	} else if (dbus_message_is_method_call(request->msg,
+						MEDIA_ENDPOINT_INTERFACE,
+						"SelectQoS")) {
 		dbus_message_iter_init(reply, &args);
 		dbus_message_iter_recurse(&args, &props);
 		ret = &props;
@@ -793,7 +814,7 @@ static bool endpoint_init_a2dp_sink(struct media_endpoint *endpoint, int *err)
 }
 #endif
 
-struct pac_select_data {
+struct pac_select_codec_data {
 	struct bt_bap_pac *pac;
 	bt_bap_pac_select_codec_t cb;
 	void *user_data;
@@ -949,10 +970,10 @@ fail:
 	return -EINVAL;
 }
 
-static void pac_select_cb(struct media_endpoint *endpoint, void *ret, int size,
+static void pac_select_codec_cb(struct media_endpoint *endpoint, void *ret, int size,
 							void *user_data)
 {
-	struct pac_select_data *data = user_data;
+	struct pac_select_codec_data *data = user_data;
 	DBusMessageIter *iter = ret;
 	int err;
 	struct iovec caps, meta;
@@ -996,7 +1017,7 @@ static int pac_select_codec(struct bt_bap_pac *lpac, struct bt_bap_pac *rpac,
 	struct iovec *caps;
 	struct iovec *metadata;
 	const char *endpoint_path;
-	struct pac_select_data *data;
+	struct pac_select_codec_data *data;
 	DBusMessage *msg;
 	DBusMessageIter iter, dict;
 	const char *key = "Capabilities";
@@ -1014,7 +1035,7 @@ static int pac_select_codec(struct bt_bap_pac *lpac, struct bt_bap_pac *rpac,
 		return -ENOMEM;
 	}
 
-	data = new0(struct pac_select_data, 1);
+	data = new0(struct pac_select_codec_data, 1);
 	data->pac = lpac;
 	data->cb = cb;
 	data->user_data = cb_data;
@@ -1051,7 +1072,7 @@ static int pac_select_codec(struct bt_bap_pac *lpac, struct bt_bap_pac *rpac,
 
 	dbus_message_iter_close_container(&iter, &dict);
 
-	if (!media_endpoint_async_call(msg, endpoint, NULL, pac_select_cb,
+	if (!media_endpoint_async_call(msg, endpoint, NULL, pac_select_codec_cb,
 								data, free))
 		return -EIO;
 
@@ -1067,9 +1088,9 @@ static void pac_cancel_select_codec(struct bt_bap_pac *lpac,
 
 	while (l) {
 		struct endpoint_request *req = l->data;
-		struct pac_select_data *data;
+		struct pac_select_codec_data *data;
 
-		if (req->cb != pac_select_cb) {
+		if (req->cb != pac_select_codec_cb) {
 			l = g_slist_next(l);
 			continue;
 		}
@@ -1084,6 +1105,148 @@ static void pac_cancel_select_codec(struct bt_bap_pac *lpac,
 		media_endpoint_cancel(req);
 		l = endpoint->requests;
 	}
+}
+
+struct pac_select_qos_data {
+	struct bt_bap_stream *stream;
+	bt_bap_pac_select_qos_t cb;
+	void *user_data;
+};
+
+static void pac_select_qos_cb(struct media_endpoint *endpoint, void *ret,
+						int size, void *user_data)
+{
+	struct pac_select_qos_data *data = user_data;
+	DBusMessageIter *iter = ret;
+	int err;
+	struct bt_bap_qos qos;
+
+	if (!ret) {
+		data->cb(data->stream, -EPERM, NULL, data->user_data);
+		return;
+	} else if (size > 0) {
+		/* Endpoint doesn't implement the method, use old values */
+		data->cb(data->stream, 0, NULL, data->user_data);
+		return;
+	}
+
+	if (dbus_message_iter_get_arg_type(iter) != DBUS_TYPE_DICT_ENTRY) {
+		DBG("Unexpected argument type: %c != %c",
+			    dbus_message_iter_get_arg_type(iter),
+			    DBUS_TYPE_DICT_ENTRY);
+		data->cb(data->stream, -EINVAL, NULL, data->user_data);
+		return;
+	}
+
+	memset(&qos, 0, sizeof(qos));
+
+	/* Mark CIG and CIS to be auto assigned */
+	qos.ucast.cig_id = BT_ISO_QOS_CIG_UNSET;
+	qos.ucast.cis_id = BT_ISO_QOS_CIS_UNSET;
+
+	err = parse_select_properties(iter, NULL, NULL, &qos);
+	if (err < 0)
+		DBG("Unable to parse properties");
+
+	data->cb(data->stream, err, &qos, data->user_data);
+}
+
+static int pac_select_qos(struct bt_bap_stream *stream,
+			struct bt_bap_pac_qos *qos, bt_bap_pac_select_qos_t cb,
+			void *cb_data, void *user_data)
+{
+	struct media_endpoint *endpoint = user_data;
+	struct bt_bap_pac *rpac;
+	const char *endpoint_path;
+	struct pac_select_qos_data *data;
+	struct iovec *caps, *metadata;
+	DBusMessage *msg;
+	DBusMessageIter iter, dict;
+	DBusMessageIter entry, variant, qos_dict;
+	const char *key = "Capabilities";
+
+	rpac = bt_bap_stream_get_rpac(stream);
+	if (!rpac)
+		return -EINVAL;
+
+	caps = bt_bap_stream_get_config(stream);
+	if (!caps)
+		return -EINVAL;
+
+	msg = dbus_message_new_method_call(endpoint->sender, endpoint->path,
+						MEDIA_ENDPOINT_INTERFACE,
+						"SelectQoS");
+	if (msg == NULL) {
+		error("Couldn't allocate D-Bus message");
+		return -ENOMEM;
+	}
+
+	data = new0(struct pac_select_qos_data, 1);
+	data->stream = stream;
+	data->cb = cb;
+	data->user_data = cb_data;
+
+	dbus_message_iter_init_append(msg, &iter);
+
+	dbus_message_iter_open_container(&iter, DBUS_TYPE_ARRAY, "{sv}", &dict);
+
+	endpoint_path = bt_bap_pac_get_user_data(rpac);
+	if (endpoint_path)
+		g_dbus_dict_append_entry(&dict, "Endpoint",
+					DBUS_TYPE_OBJECT_PATH, &endpoint_path);
+
+	key = "Capabilities";
+	g_dbus_dict_append_basic_array(&dict, DBUS_TYPE_STRING, &key,
+						DBUS_TYPE_BYTE, &caps->iov_base,
+						caps->iov_len);
+
+	metadata = bt_bap_stream_get_metadata(stream);
+	if (metadata) {
+		key = "Metadata";
+		g_dbus_dict_append_basic_array(&dict, DBUS_TYPE_STRING, &key,
+						DBUS_TYPE_BYTE,
+						&metadata->iov_base,
+						metadata->iov_len);
+	}
+
+	key = "QoS";
+	dbus_message_iter_open_container(&dict, DBUS_TYPE_DICT_ENTRY,
+			NULL, &entry);
+	dbus_message_iter_append_basic(&entry, DBUS_TYPE_STRING, &key);
+	dbus_message_iter_open_container(&entry, DBUS_TYPE_VARIANT,
+			"a{sv}", &variant);
+	dbus_message_iter_open_container(&variant, DBUS_TYPE_ARRAY,
+			"{sv}", &qos_dict);
+
+	g_dbus_dict_append_entry(&qos_dict, "Framing", DBUS_TYPE_BYTE,
+			&qos->framing);
+
+	g_dbus_dict_append_entry(&qos_dict, "PHY", DBUS_TYPE_BYTE,
+			&qos->phys);
+
+	g_dbus_dict_append_entry(&qos_dict, "MaximumLatency",
+			DBUS_TYPE_UINT16, &qos->latency);
+
+	g_dbus_dict_append_entry(&qos_dict, "MinimumDelay",
+			DBUS_TYPE_UINT32, &qos->pd_min);
+
+	g_dbus_dict_append_entry(&qos_dict, "MaximumDelay",
+			DBUS_TYPE_UINT32, &qos->pd_max);
+
+	g_dbus_dict_append_entry(&qos_dict, "PreferredMinimumDelay",
+			DBUS_TYPE_UINT32, &qos->ppd_min);
+
+	g_dbus_dict_append_entry(&qos_dict, "PreferredMaximumDelay",
+			DBUS_TYPE_UINT32, &qos->ppd_max);
+
+	dbus_message_iter_close_container(&variant, &qos_dict);
+	dbus_message_iter_close_container(&entry, &variant);
+	dbus_message_iter_close_container(&dict, &entry);
+
+	dbus_message_iter_close_container(&iter, &dict);
+
+	return media_endpoint_async_call(msg, endpoint, NULL, pac_select_qos_cb,
+								data, free);
 }
 
 struct pac_config_data {
@@ -1261,6 +1424,7 @@ static struct bt_bap_pac_ops pac_ops = {
 	.select_codec = pac_select_codec,
 	.cancel_select_codec = pac_cancel_select_codec,
 	.config = pac_config,
+	.select_qos = pac_select_qos,
 	.clear = pac_clear,
 };
 
