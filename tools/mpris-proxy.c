@@ -2027,6 +2027,45 @@ static GDBusProxy* connect_obex_session(const char *address, uint16_t port) {
 	return g_dbus_proxy_new(obex_client, path, BLUEZ_OBEX_IMAGE_INTERFACE);
 }
 
+// static gboolean disconnect_obex_session(struct obex_session *obex_session) {
+// 	DBusMessage *msg, *reply;
+// 	DBusMessageIter iter;
+// 	const char *path = g_dbus_proxy_get_path(obex_session->obex);
+// 	GSList *l;
+// 	DBusError err;
+
+// 	msg = dbus_message_new_method_call(BLUEZ_OBEX_BUS_NAME,
+// 					BLUEZ_OBEX_PATH,
+// 					BLUEZ_OBEX_CLIENT_INTERFACE,
+// 					"RemoveSession");
+// 	dbus_message_iter_init_append(msg, &iter);
+// 	dbus_message_iter_append_basic(&iter, DBUS_TYPE_OBJECT_PATH, &path);
+
+// 	dbus_error_init(&err);
+// 	reply = dbus_connection_send_with_reply_and_block(session, msg, -1, &err);
+// 	dbus_message_unref(msg);
+// 	if (!reply) {
+// 		if (dbus_error_is_set(&err)) {
+// 			fprintf(stderr, "%s\n", err.message);
+// 			dbus_error_free(&err);
+// 		}
+// 		return false;
+// 	}
+
+// 	for (l = players; l; l = l->next) {
+// 		struct player *player = l->data;
+// 		if (player->obex == obex_session)
+// 			player->obex = NULL;
+// 	}
+
+// 	g_dbus_proxy_unref(obex_session->obex);
+// 	g_dbus_proxy_unref(obex_session->device);
+// 	obex_sessions = g_slist_remove(obex_sessions, obex_session);
+// 	g_free(obex_session);
+
+// 	return true;
+// }
+
 static struct obex_session *find_obex_session_by_device(const char *device)
 {
 	GSList *l;
