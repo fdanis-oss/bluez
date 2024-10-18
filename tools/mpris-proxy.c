@@ -2107,23 +2107,29 @@ static void register_playlist(struct player *player, GDBusProxy *proxy)
 	const char *path;
 	DBusMessageIter iter;
 
+	printf("register_playlist 1\n");
 	if (!g_dbus_proxy_get_property(player->proxy, "Playlist", &iter))
 		return;
 
+	printf("register_playlist 2\n");
 	dbus_message_iter_get_basic(&iter, &path);
 
+	printf("register_playlist 3 %s %s\n", path, g_dbus_proxy_get_path(proxy));
 	if (!g_str_equal(path, g_dbus_proxy_get_path(proxy)))
 		return;
 
+	printf("register_playlist 4\n");
 	player->playlist = g_dbus_proxy_ref(proxy);
 
 	g_dbus_emit_property_changed(player->conn, MPRIS_PLAYER_PATH,
 						MPRIS_PLAYLISTS_INTERFACE,
 						"PlaylistCount");
 
+	printf("register_playlist 5\n");
 	if (player->tracklist == NULL)
 		return;
 
+	printf("register_playlist 6\n");
 	g_dbus_proxy_method_call(player->tracklist->proxy, "ChangeFolder",
 				change_folder_setup, change_folder_reply,
 				player, NULL);
