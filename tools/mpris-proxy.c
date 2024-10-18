@@ -2029,6 +2029,45 @@ static GDBusProxy *connect_obex_session(const char *address, uint16_t port)
 	return g_dbus_proxy_new(obex_client, path, BLUEZ_OBEX_IMAGE_INTERFACE);
 }
 
+// static gboolean disconnect_obex_session(struct obex_session *obex_session) {
+// 	DBusMessage *msg, *reply;
+// 	DBusMessageIter iter;
+// 	const char *path = g_dbus_proxy_get_path(obex_session->obex);
+// 	GSList *l;
+// 	DBusError err;
+
+// 	msg = dbus_message_new_method_call(BLUEZ_OBEX_BUS_NAME,
+// 					BLUEZ_OBEX_PATH,
+// 					BLUEZ_OBEX_CLIENT_INTERFACE,
+// 					"RemoveSession");
+// 	dbus_message_iter_init_append(msg, &iter);
+// 	dbus_message_iter_append_basic(&iter, DBUS_TYPE_OBJECT_PATH, &path);
+
+// 	dbus_error_init(&err);
+// 	reply = dbus_connection_send_with_reply_and_block(session, msg, -1, &err);
+// 	dbus_message_unref(msg);
+// 	if (!reply) {
+// 		if (dbus_error_is_set(&err)) {
+// 			fprintf(stderr, "%s\n", err.message);
+// 			dbus_error_free(&err);
+// 		}
+// 		return false;
+// 	}
+
+// 	for (l = players; l; l = l->next) {
+// 		struct player *player = l->data;
+// 		if (player->obex == obex_session)
+// 			player->obex = NULL;
+// 	}
+
+// 	g_dbus_proxy_unref(obex_session->obex);
+// 	g_dbus_proxy_unref(obex_session->device);
+// 	obex_sessions = g_slist_remove(obex_sessions, obex_session);
+// 	g_free(obex_session);
+
+// 	return true;
+// }
+
 static struct obex_session *find_obex_session_by_device(const char *device)
 {
 	GSList *l;
@@ -2646,6 +2685,7 @@ static void player_property_changed(GDBusProxy *proxy, const char *name,
 
 	if (strcasecmp(name, "Track") == 0 && player->obex) {
 		const char *handle = obex_get_image_handle(iter);
+
 		if (handle)
 			obex_get_image(player, handle);
 	}
@@ -2796,33 +2836,36 @@ static void obex_proxy_added(GDBusProxy *proxy, void *user_data)
 			struct player *player = l->data;
 			DBusMessageIter iter;
 			const char *address;
+			uint16_t port;
+			struct obex_session *session;
 
-			if (g_dbus_proxy_get_property(player->proxy,
-					"ObexPort", &iter) &&
-					!player->obex) {
-				uint16_t port;
-				struct obex_session *session;
+			if (!g_dbus_proxy_get_property(player->proxy,
+					"ObexPort", &iter) ||
+					player->obex)
+				continue;
 
-				dbus_message_iter_get_basic(&iter, &port);
+			dbus_message_iter_get_basic(&iter, &port);
 
-				if (!g_dbus_proxy_get_property(player->device,
-						"Address", &iter))
-					continue;
+			if (!g_dbus_proxy_get_property(player->device,
+					"Address", &iter))
+				continue;
 
-				dbus_message_iter_get_basic(&iter, &address);
+			dbus_message_iter_get_basic(&iter, &address);
 
-				session = find_obex_session_by_device(path);
-				if (session == NULL || session->port != port) {
-					printf("Bluetooth Obex Create new session\n");
-					session = g_new0(struct obex_session, 1);
-					session->obex = connect_obex_session(address, port);
-					session->device = g_dbus_proxy_ref(player->device);
-					session->port = port;
+			session = find_obex_session_by_device(path);
+			if (session == NULL || session->port != port) {
+				printf("Bluetooth Obex Create new session\n");
+				session = g_new0(struct obex_session, 1);
+				session->obex = connect_obex_session(address,
+									port);
+				session->device = g_dbus_proxy_ref(
+							player->device);
+				session->port = port;
 
-					obex_sessions = g_slist_prepend(obex_sessions, session);
-				}
-				player->obex = session;
+				obex_sessions = g_slist_prepend(obex_sessions,
+								session);
 			}
+			player->obex = session;
 		}
 	}
 }
