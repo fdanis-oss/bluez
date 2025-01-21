@@ -902,6 +902,7 @@ static DBusMessage *media_folder_list_items(DBusConnection *conn,
 	uint32_t start, end;
 	int err;
 
+	DBG("##### %s", mp->path);
 	dbus_message_iter_init(msg, &iter);
 
 	if (parse_filters(mp, &iter, &start, &end) < 0)
@@ -1164,7 +1165,9 @@ static const GDBusPropertyTable media_folder_properties[] = {
 static void media_player_set_scope(struct media_player *mp,
 						struct media_folder *folder)
 {
+	DBG("##### mp: %p folder: %p", mp, folder);
 	if (mp->scope == NULL) {
+		DBG("##### #1");
 		if (!g_dbus_register_interface(btd_get_dbus_connection(),
 					mp->path, MEDIA_FOLDER_INTERFACE,
 					media_folder_methods,
@@ -1172,12 +1175,15 @@ static void media_player_set_scope(struct media_player *mp,
 					media_folder_properties, mp, NULL)) {
 			error("D-Bus failed to register %s on %s path",
 					MEDIA_FOLDER_INTERFACE, mp->path);
+		DBG("##### #2");
 			return;
 		}
+		DBG("##### #3");
 		mp->scope = folder;
 		return;
 	}
 
+		DBG("##### #4");
 	return media_player_change_scope(mp, folder);
 }
 
@@ -1874,15 +1880,24 @@ static struct media_item *media_folder_create_item(struct media_player *mp,
 	struct media_item *item;
 	const char *strtype;
 
-	item = media_folder_find_item(folder, uid);
-	if (item != NULL)
-		return item;
+	DBG("##### mp: %p folder: %p name: %p type:%u uid: %lu", mp, folder, name, type, uid);
+	if (folder) {
+		item = media_folder_find_item(folder, uid);
+		if (item != NULL)
+			return item;
+	}
 
+	DBG("##### 1");
 	strtype = type_to_string(type);
 	if (strtype == NULL)
 		return NULL;
 
 	DBG("%s type %s uid %" PRIu64 "", name, strtype, uid);
+
+	if (type == PLAYER_ITEM_TYPE_AUDIO && folder == NULL) {
+		warn("!!!!! Audio track without folder, discarding");
+		return NULL;
+	}
 
 	item = g_new0(struct media_item, 1);
 	item->player = mp;
@@ -1925,6 +1940,7 @@ struct media_item *media_player_create_item(struct media_player *mp,
 						player_item_type_t type,
 						uint64_t uid)
 {
+	DBG("##### mp: %p mp->scope: %p name: %p type:%u uid: %lu", mp, mp ? mp->scope : NULL, name, type, uid);
 	return media_folder_create_item(mp, mp->scope, name, type, uid);
 }
 

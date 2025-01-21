@@ -2586,6 +2586,7 @@ static struct media_item *parse_media_element(struct avrcp *session,
 	uint64_t uid;
 	uint8_t count;
 
+	DBG("#####");
 	if (len < 13)
 		return NULL;
 
@@ -2626,6 +2627,7 @@ static struct media_item *parse_media_folder(struct avrcp *session,
 	uint8_t type;
 	uint8_t playable;
 
+	DBG("#####");
 	if (len < 12)
 		return NULL;
 
@@ -2661,11 +2663,13 @@ static gboolean avrcp_list_items_rsp(struct avctp *conn, uint8_t *operands,
 	size_t i;
 	int err = 0;
 
+	DBG("##### 0");
 	if (player->p == NULL) {
 		media_player_list_complete(player->user_data, NULL, -EINVAL);
 		return FALSE;
 	}
 
+	DBG("##### 1 %s %p", player->path, player->p);
 	if (pdu == NULL) {
 		err = -ETIMEDOUT;
 		goto done;
@@ -2770,6 +2774,7 @@ static void avrcp_list_items(struct avrcp *session, uint32_t start,
 
 	length += 6 * sizeof(uint32_t);
 
+	DBG("##### %s %p", player->path, player->p);
 	avctp_send_browsing_req(session->conn, buf, length,
 					avrcp_list_items_rsp, session);
 }
@@ -2881,6 +2886,7 @@ static void avrcp_set_browsed_player(struct avrcp *session,
 	memcpy(pdu->params, &id, 2);
 	pdu->param_len = cpu_to_be16(2);
 
+	DBG("#####");
 	avctp_send_browsing_req(session->conn, buf, sizeof(buf),
 				avrcp_set_browsed_player_rsp, session);
 }
@@ -2897,16 +2903,19 @@ static gboolean avrcp_get_item_attributes_rsp(struct avctp *conn,
 	struct media_item *item;
 	uint8_t count;
 
+	DBG("##### 1");
 	if (pdu == NULL) {
 		avrcp_get_element_attributes(session);
 		return FALSE;
 	}
 
+	DBG("##### 2");
 	if (pdu->params[0] != AVRCP_STATUS_SUCCESS || operand_count < 4) {
 		avrcp_get_element_attributes(session);
 		return FALSE;
 	}
 
+	DBG("##### 3");
 	count = pdu->params[1];
 
 	if (be16_to_cpu(pdu->param_len) - 1 < count * 8) {
@@ -2914,16 +2923,22 @@ static gboolean avrcp_get_item_attributes_rsp(struct avctp *conn,
 		return FALSE;
 	}
 
+	DBG("##### 4");
 	media_player_clear_metadata(mp);
 
+	DBG("##### 5");
 	item = media_player_set_playlist_item(mp, player->uid);
 
+	DBG("##### 6");
 	avrcp_parse_attribute_list(player, item, &pdu->params[2], count);
 
+	DBG("##### 7");
 	media_player_metadata_changed(mp);
 
+	DBG("##### 8");
 	avrcp_get_play_status(session);
 
+	DBG("##### 9");
 	return FALSE;
 }
 
@@ -2941,6 +2956,7 @@ static void avrcp_get_item_attributes(struct avrcp *session, uint64_t uid)
 	put_be16(player->uid_counter, &pdu->params[9]);
 	pdu->param_len = cpu_to_be16(12);
 
+	DBG("#####");
 	avctp_send_browsing_req(session->conn, buf, sizeof(buf),
 				avrcp_get_item_attributes_rsp, session);
 }
@@ -3253,6 +3269,7 @@ static void avrcp_change_path(struct avrcp *session, uint8_t direction,
 	pdu->pdu_id = AVRCP_CHANGE_PATH;
 	pdu->param_len = cpu_to_be16(11);
 
+	DBG("#####");
 	avctp_send_browsing_req(session->conn, buf, sizeof(buf),
 					avrcp_change_path_rsp, session);
 }
@@ -3321,6 +3338,7 @@ static void avrcp_search(struct avrcp *session, const char *string)
 	pdu->pdu_id = AVRCP_SEARCH;
 	pdu->param_len = cpu_to_be16(len - AVRCP_BROWSING_HEADER_LENGTH);
 
+	DBG("#####");
 	avctp_send_browsing_req(session->conn, buf, len, avrcp_search_rsp,
 								session);
 }
@@ -3513,6 +3531,7 @@ static void avrcp_get_total_numberofitems(struct avrcp *session)
 
 	pdu->params[0] = player->scope;
 
+	DBG("#####");
 	avctp_send_browsing_req(session->conn, buf, sizeof(buf),
 				avrcp_get_total_numberofitems_rsp, session);
 }
@@ -3725,6 +3744,7 @@ static gboolean avrcp_get_media_player_list_rsp(struct avctp *conn,
 	size_t i;
 	GSList *removed;
 
+	DBG("#####");
 	if (pdu == NULL || pdu->params[0] != AVRCP_STATUS_SUCCESS ||
 							operand_count < 5)
 		return FALSE;
@@ -3780,6 +3800,7 @@ static void avrcp_get_media_player_list(struct avrcp *session)
 	put_be32(UINT32_MAX, &pdu->params[5]);
 	pdu->param_len = cpu_to_be16(10);
 
+	DBG("#####");
 	avctp_send_browsing_req(session->conn, buf, sizeof(buf),
 				avrcp_get_media_player_list_rsp, session);
 }
@@ -3827,12 +3848,16 @@ static void avrcp_status_changed(struct avrcp *session,
 static void avrcp_track_changed(struct avrcp *session,
 						struct avrcp_header *pdu)
 {
+	DBG("##### session->browsing_id: %u", session->browsing_id);
 	if (session->browsing_id) {
 		struct avrcp_player *player = session->controller->player;
 		player->uid = get_be64(&pdu->params[1]);
+	DBG("##### player->uid: %lu, player->browsed: %u, player->addressed: %u", player->uid, player->browsed, player->addressed);
 		avrcp_get_item_attributes(session, player->uid);
-	} else
+	} else {
+	DBG("#####");
 		avrcp_get_element_attributes(session);
+	}
 }
 
 static void avrcp_playback_pos_changed(struct avrcp *session,
@@ -3884,6 +3909,7 @@ static void avrcp_now_playing_changed(struct avrcp *session,
 static void avrcp_available_players_changed(struct avrcp *session,
 						struct avrcp_header *pdu)
 {
+	DBG("#####");
 	avrcp_get_media_player_list(session);
 }
 
@@ -3893,9 +3919,11 @@ static void avrcp_addressed_player_changed(struct avrcp *session,
 	struct avrcp_player *player = session->controller->player;
 	uint16_t id = get_be16(&pdu->params[1]);
 
+	DBG("##### 1");
 	if (player != NULL && player->id == id)
 		return;
 
+	DBG("##### 2");
 	player = find_ct_player(session, id);
 	if (player == NULL) {
 		player = create_ct_player(session, id);
@@ -3903,6 +3931,7 @@ static void avrcp_addressed_player_changed(struct avrcp *session,
 			return;
 	}
 
+	DBG("##### 3");
 	player->addressed = true;
 	player->uid_counter = get_be16(&pdu->params[3]);
 	set_ct_player(session, player);
@@ -3910,6 +3939,7 @@ static void avrcp_addressed_player_changed(struct avrcp *session,
 	if (player->features != NULL)
 		return;
 
+	DBG("##### 4");
 	avrcp_get_media_player_list(session);
 }
 
@@ -3955,6 +3985,7 @@ static gboolean avrcp_handle_event(struct avctp *conn, uint8_t code,
 		goto changed;
 	}
 
+	DBG("##### event: %u", event);
 	switch (event) {
 	case AVRCP_EVENT_VOLUME_CHANGED:
 		avrcp_volume_changed(session, pdu);
