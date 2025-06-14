@@ -1234,6 +1234,18 @@ static const struct capabilities {
 				LC3_DATA(LC3_FREQ_ANY, LC3_DURATION_ANY, 26,
 					240),
 				UTIL_IOV_INIT()),
+
+	/* SCO CVSD:
+	 */
+	CODEC_CAPABILITIES("hfp_ag/cvsd", HFP_AG_UUID, 1,
+				UTIL_IOV_INIT(),
+				UTIL_IOV_INIT()),
+
+	/* SCO mSBC:
+	 */
+	CODEC_CAPABILITIES("hfp_ag/msbc", HFP_AG_UUID, 2,
+				UTIL_IOV_INIT(),
+				UTIL_IOV_INIT()),
 };
 
 struct codec_preset {

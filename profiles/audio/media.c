@@ -60,6 +60,7 @@
 #include "media.h"
 #include "transport.h"
 #include "a2dp.h"
+#include "hfp-hf.h"
 
 #ifdef HAVE_AVRCP
 #include "avrcp.h"
@@ -109,6 +110,7 @@ struct media_endpoint {
 	struct a2dp_sep		*sep;
 	struct bt_bap_pac	*pac;
 	struct bt_asha_device	*asha;
+	bool			sco;
 	char			*sender;	/* Endpoint DBus bus id */
 	char			*path;		/* Endpoint object path */
 	char			*uuid;		/* Endpoint property UUID */
@@ -205,6 +207,11 @@ static void media_endpoint_destroy(struct media_endpoint *endpoint)
 	if (endpoint->pac) {
 		bt_bap_remove_pac(endpoint->pac);
 		endpoint->pac = NULL;
+	}
+
+	if (endpoint->sco) {
+		hfp_hf_sco_remove(endpoint->adapter->btd_adapter, endpoint);
+		endpoint->sco = false;
 	}
 
 	g_dbus_remove_watch(btd_get_dbus_connection(), endpoint->watch);
@@ -1371,6 +1378,20 @@ static bool endpoint_init_asha(struct media_endpoint *endpoint,
 	return true;
 }
 
+static bool endpoint_init_sco(struct media_endpoint *endpoint,
+						int *err)
+{
+	if (!(g_dbus_get_flags() & G_DBUS_FLAG_ENABLE_EXPERIMENTAL)) {
+		DBG("D-Bus experimental not enabled");
+		*err = -ENOTSUP;
+		return false;
+	}
+
+	endpoint->sco = true;
+
+	return hfp_hf_sco_listen(endpoint->adapter->btd_adapter, endpoint);
+}
+
 static bool endpoint_properties_exists(const char *uuid,
 						struct btd_device *dev,
 						void *user_data)
@@ -1500,6 +1521,11 @@ static bool experimental_asha_supported(struct btd_adapter *adapter)
 	return g_dbus_get_flags() & G_DBUS_FLAG_ENABLE_EXPERIMENTAL;
 }
 
+static bool experimental_sco_supported(struct btd_adapter *adapter)
+{
+	return g_dbus_get_flags() & G_DBUS_FLAG_ENABLE_EXPERIMENTAL;
+}
+
 static const struct media_endpoint_init {
 	const char *uuid;
 	bool (*func)(struct media_endpoint *endpoint, int *err);
@@ -1519,6 +1545,8 @@ static const struct media_endpoint_init {
 			experimental_bcast_sink_ep_supported },
 	{ ASHA_PROFILE_UUID, endpoint_init_asha,
 			experimental_asha_supported },
+	{ HFP_AG_UUID, endpoint_init_sco,
+			experimental_sco_supported },
 };
 
 static struct media_endpoint *

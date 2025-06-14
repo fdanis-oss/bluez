@@ -1591,6 +1591,15 @@ static const GDBusPropertyTable transport_asha_properties[] = {
 };
 #endif /* HAVE_ASHA */
 
+static const GDBusPropertyTable transport_hfp_properties[] = {
+	{ "Device", "o", get_device },
+	{ "Endpoint", "o", get_endpoint, NULL, endpoint_exists },
+	{ "UUID", "s", get_uuid },
+	{ "Codec", "y", get_codec },
+	{ "State", "s", get_state },
+	{ }
+};
+
 #ifdef HAVE_A2DP
 static void transport_a2dp_destroy(void *data)
 {
@@ -2397,6 +2406,14 @@ static void *transport_asha_init(struct media_transport *transport, void *data)
 }
 #endif /* HAVE_ASHA */
 
+#ifdef HAVE_HFP
+static void *transport_hfp_init(struct media_transport *transport, void *data)
+{
+	/* We just store the struct hfp_device on the transport */
+	return data;
+}
+#endif /* HAVE_HFP */
+
 #define TRANSPORT_OPS(_uuid, _props, _set_owner, _remove_owner, _init, \
 		      _resume, _suspend, _cancel, _set_state, _get_stream, \
 		      _get_volume, _set_volume, _set_delay, _update_links, \
@@ -2454,6 +2471,14 @@ static void *transport_asha_init(struct media_transport *transport, void *data)
 			transport_asha_get_volume, transport_asha_set_volume, \
 			NULL, NULL, NULL)
 
+#define HFP_OPS(_uuid) \
+	TRANSPORT_OPS(_uuid, transport_hfp_properties, NULL, NULL, \
+			transport_hfp_init, \
+			NULL, NULL, \
+			NULL, NULL, NULL, \
+			NULL, NULL, \
+			NULL, NULL, NULL)
+
 static const struct media_transport_ops transport_ops[] = {
 #ifdef HAVE_A2DP
 	A2DP_OPS(A2DP_SOURCE_UUID, transport_a2dp_src_init,
@@ -2480,6 +2505,9 @@ static const struct media_transport_ops transport_ops[] = {
 #ifdef HAVE_ASHA
 	ASHA_OPS(ASHA_PROFILE_UUID),
 #endif /* HAVE_ASHA */
+#ifdef HAVE_HFP
+	HFP_OPS(HFP_AG_UUID),
+#endif /* HAVE_HFP */
 };
 
 static const struct media_transport_ops *
