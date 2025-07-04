@@ -479,7 +479,7 @@ static void test_hf_init(gconstpointer data)
 {
 	struct context *context = create_context(data);
 
-	context->hfp_hf = hfp_hf_new(context->fd_client);
+	context->hfp_hf = hfp_hf_new(context->fd_client, NULL);
 	g_assert(context->hfp_hf);
 	g_assert(hfp_hf_set_close_on_unref(context->hfp_hf, true));
 
@@ -534,7 +534,7 @@ static void test_hf_send_command(gconstpointer data)
 	const struct test_pdu *pdu;
 	bool ret;
 
-	context->hfp_hf = hfp_hf_new(context->fd_client);
+	context->hfp_hf = hfp_hf_new(context->fd_client, NULL);
 	g_assert(context->hfp_hf);
 
 	ret = hfp_hf_set_close_on_unref(context->hfp_hf, true);
@@ -640,7 +640,7 @@ static void test_hf_unsolicited(gconstpointer data)
 	struct context *context = create_context(data);
 	bool ret;
 
-	context->hfp_hf = hfp_hf_new(context->fd_client);
+	context->hfp_hf = hfp_hf_new(context->fd_client, NULL);
 	g_assert(context->hfp_hf);
 
 	ret = hfp_hf_set_close_on_unref(context->hfp_hf, true);
@@ -666,7 +666,7 @@ static void test_hf_robustness(gconstpointer data)
 	struct context *context = create_context(data);
 	bool ret;
 
-	context->hfp_hf = hfp_hf_new(context->fd_client);
+	context->hfp_hf = hfp_hf_new(context->fd_client, NULL);
 	g_assert(context->hfp_hf);
 
 	ret = hfp_hf_set_close_on_unref(context->hfp_hf, true);
@@ -678,6 +678,68 @@ static void test_hf_robustness(gconstpointer data)
 	context->hfp_hf = NULL;
 
 	context_quit(context);
+}
+
+static void hf_update_indicator(enum hfp_indicator indicator, uint32_t val)
+{
+	switch (indicator) {
+		case HFP_INDICATOR_SERVICE:
+			g_assert_cmpint(val, ==, 1);
+			break;
+		case HFP_INDICATOR_CALL:
+			g_assert_cmpint(val, ==, 0);
+			break;
+		case HFP_INDICATOR_CALLSETUP:
+			g_assert_cmpint(val, ==, 0);
+			break;
+		case HFP_INDICATOR_CALLHELD:
+			g_assert_cmpint(val, ==, 0);
+			break;
+		case HFP_INDICATOR_SIGNAL:
+			g_assert_cmpint(val, ==, 5);
+			break;
+		case HFP_INDICATOR_ROAM:
+			g_assert_cmpint(val, ==, 0);
+			break;
+		case HFP_INDICATOR_BATTCHG:
+			g_assert_cmpint(val, ==, 5);
+			break;
+		case HFP_INDICATOR_LAST:
+		default:
+			tester_test_failed();
+	}
+}
+
+static struct hfp_hf_callbacks hf_slc_callbacks = {
+	.update_indicator = hf_update_indicator,
+};
+
+static void hf_slc_response_cb(enum hfp_result res, enum hfp_error cme_err,
+							void *user_data)
+{
+	struct context *context = user_data;
+
+	g_assert_cmpint(res, ==, HFP_RESULT_OK);
+
+	hfp_hf_disconnect(context->hfp_hf);
+}
+
+static void test_hf_slc(gconstpointer data)
+{
+	struct context *context = create_context(data);
+	bool ret;
+
+	context->hfp_hf = hfp_hf_new(context->fd_client, &hf_slc_callbacks);
+	g_assert(context->hfp_hf);
+
+	ret = hfp_hf_set_close_on_unref(context->hfp_hf, true);
+	g_assert(ret);
+
+	if (context->data->response_func) {
+		ret = hfp_hf_start_slc(context->hfp_hf,
+					context->data->response_func, context);
+		g_assert(ret);
+	}
 }
 
 int main(int argc, char *argv[])
@@ -848,6 +910,40 @@ int main(int argc, char *argv[])
 			raw_pdu('+', 'C', 'H', 'L', 'D', '\0'),
 			frg_pdu('+', 'C', 'H', 'L', 'D', ':'),
 			frg_pdu('1', ',', '2', 'x', '\r', '\n'),
+			data_end());
+
+	define_hf_test("/hfp_hf/test_slc_1", test_hf_slc,
+			NULL, hf_slc_response_cb,
+			raw_pdu('\r', '\n', '+', 'B', 'R', 'S', 'F', ':',
+				' ', '4', '0', '9', '5', '\r', '\n'),
+			frg_pdu('\r', '\n', 'O', 'K', '\r', '\n'),
+
+			raw_pdu('\r', '\n', '+', 'C', 'I', 'N', 'D', ':'),
+			frg_pdu('(', '\"', 's', 'e', 'r', 'v', 'i', 'c', 'e'),
+			frg_pdu('\"', '(', '0', ',', '1', ')', ')', ','),
+			frg_pdu('(', '\"', 'c', 'a', 'l', 'l', '\"'),
+			frg_pdu('(', '0', ',', '1', ')', ')', ','),
+			frg_pdu('(', '\"', 'c', 'a', 'l', 'l', 's', 'e', 't'),
+			frg_pdu('u', 'p', '\"', ',', '(', '0', '-', '3', ')'),
+			frg_pdu(')', ','),
+			frg_pdu('(', '\"', 'c', 'a', 'l', 'l', 'h', 'e', 'l'),
+			frg_pdu('d', '\"', ',', '(', '0', '-', '2',')', ')'),
+			frg_pdu(',' , '(', '\"', 's', 'i', 'g', 'n', 'a', 'l'),
+			frg_pdu('\"', '(', '0', '-', '5', ')', ')', ','),
+			frg_pdu('(', '\"', 'r', 'o', 'a', 'm', '\"', ',', '('),
+			frg_pdu('0', ',', '1', ')', ')', ','),
+			frg_pdu('(', '\"', 'b', 'a', 't', 't', 'c', 'h', 'g'),
+			frg_pdu('\"', '(', '0', '-', '5', ')', ')', ','),
+			frg_pdu('\r', '\n'),
+			frg_pdu('\r', '\n', 'O', 'K', '\r', '\n'),
+
+			raw_pdu('\r', '\n', '+', 'C', 'I', 'N', 'D', ':'),
+			frg_pdu('1', ',', '0', ',', '0', ',', '0', ',', '5'),
+			frg_pdu(',', '0', ',', '5', '\r', '\n'),
+			frg_pdu('\r', '\n', 'O', 'K', '\r', '\n'),
+
+			raw_pdu('\r', '\n', 'O', 'K', '\r', '\n'),
+
 			data_end());
 
 	return tester_run();
