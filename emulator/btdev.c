@@ -6223,7 +6223,7 @@ static struct le_per_adv *le_per_adv_new(struct btdev *btdev, uint8_t addr_type,
 {
 	struct le_per_adv *per_adv;
 
-	per_adv = new0(struct le_per_adv, 1);
+	per_adv = malloc0(sizeof(struct le_per_adv));
 
 	per_adv->dev = btdev;
 	per_adv->addr_type = addr_type;
