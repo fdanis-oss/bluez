@@ -1464,6 +1464,7 @@ static bool endpoint_init_asha(struct media_endpoint *endpoint,
 static bool endpoint_init_sco(struct media_endpoint *endpoint,
 						int *err)
 {
+	DBG("########## %s %s %s %u", endpoint->sender, endpoint->path, endpoint->uuid, endpoint->codec);
 	if (!(g_dbus_get_flags() & G_DBUS_FLAG_ENABLE_EXPERIMENTAL)) {
 		DBG("D-Bus experimental not enabled");
 		*err = -ENOTSUP;
@@ -1633,6 +1634,8 @@ static const struct media_endpoint_init {
 #ifdef HAVE_HFP
 	{ HFP_AG_UUID, endpoint_init_sco,
 			experimental_sco_supported },
+	// { HFP_HS_UUID, endpoint_init_sco,
+	// 		experimental_sco_supported },
 #endif
 };
 

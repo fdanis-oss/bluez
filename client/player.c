@@ -1369,12 +1369,18 @@ static const struct capabilities {
 	CODEC_CAPABILITIES("hfp_ag/cvsd", HFP_AG_UUID, 1,
 				UTIL_IOV_INIT(),
 				UTIL_IOV_INIT()),
+	// CODEC_CAPABILITIES("hfp_hf/cvsd", HFP_HS_UUID, 1,
+	// 			UTIL_IOV_INIT(),
+	// 			UTIL_IOV_INIT()),
 
 	/* SCO mSBC:
 	 */
 	CODEC_CAPABILITIES("hfp_ag/msbc", HFP_AG_UUID, 2,
 				UTIL_IOV_INIT(),
 				UTIL_IOV_INIT()),
+	// CODEC_CAPABILITIES("hfp_hf/msbc", HFP_HS_UUID, 2,
+	// 			UTIL_IOV_INIT(),
+	// 			UTIL_IOV_INIT()),
 };
 
 struct codec_preset {
@@ -3081,8 +3087,10 @@ static void endpoint_free(void *data)
 	if (ep->msg)
 		dbus_message_unref(ep->msg);
 
-	queue_destroy(ep->preset->custom, free);
-	ep->preset->custom = NULL;
+	if (ep->preset) {
+		queue_destroy(ep->preset->custom, free);
+		ep->preset->custom = NULL;
+	}
 
 	if (ep->codec == 0xff)
 		free(ep->preset);

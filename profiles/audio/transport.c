@@ -2596,6 +2596,8 @@ static guint transport_hfp_resume(struct media_transport *transport,
 {
 	struct hfp_device *hfp_dev = transport->data;
 
+DBG("##### %p", owner);
+
 	return hfp_hf_sco_start(hfp_dev, hfp_transport_resume_cb, owner);
 }
 
@@ -2620,6 +2622,8 @@ static guint transport_hfp_suspend(struct media_transport *transport,
 {
 	struct hfp_device *hfp_dev = transport->data;
 	guint ret = 0;
+
+DBG("##### %p", owner);
 
 	if (owner) {
 		ret = hfp_hf_sco_stop(hfp_dev);
