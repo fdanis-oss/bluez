@@ -305,6 +305,19 @@ struct btp_gatt_char_value {
 
 #define BTP_OP_GATT_READ_SUPPORTED_COMMANDS	0x01
 
+#define BTP_OP_GATT_READ			0x11
+struct btp_gatt_read_cp {
+	uint8_t address_type;
+	bdaddr_t address;
+	uint16_t handle;
+} __packed;
+
+struct btp_gatt_read_rp {
+	uint8_t att_response;
+	uint16_t data_length;
+	uint8_t data[];
+} __packed;
+
 #define BTP_OP_GATT_READ_UUID			0x12
 struct btp_gatt_read_uuid_cp {
 	uint8_t address_type;
