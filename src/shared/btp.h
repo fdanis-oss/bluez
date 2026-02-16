@@ -334,6 +334,19 @@ struct btp_gatt_read_uuid_rp {
 	struct btp_gatt_char_value values[];
 } __packed;
 
+#define BTP_OP_GATT_WRITE			0x17
+struct btp_gatt_write_cp {
+	uint8_t address_type;
+	bdaddr_t address;
+	uint16_t handle;
+	uint16_t data_length;
+	uint8_t data[];
+} __packed;
+
+struct btp_gatt_write_rp {
+	uint8_t att_response;
+} __packed;
+
 #define BTP_OP_BAP_READ_SUPPORTED_COMMANDS	0x01
 
 #define BTP_OP_BAP_DISCOVER			0x02
