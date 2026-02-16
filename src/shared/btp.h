@@ -334,6 +334,15 @@ struct btp_gatt_read_uuid_rp {
 	struct btp_gatt_char_value values[];
 } __packed;
 
+#define BTP_OP_GATT_WRITE_WITHOUT_RSP		0x15
+struct btp_gatt_write_without_rsp_cp {
+	uint8_t address_type;
+	bdaddr_t address;
+	uint16_t handle;
+	uint16_t data_length;
+	uint8_t data[];
+} __packed;
+
 #define BTP_OP_GATT_WRITE			0x17
 struct btp_gatt_write_cp {
 	uint8_t address_type;

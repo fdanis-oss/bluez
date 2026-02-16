@@ -286,6 +286,7 @@ failed:
 struct gatt_write_req {
 	struct btp_adapter *adapter;
 	const struct btp_gatt_write_cp *cp;
+	const char *type;
 };
 
 static void gatt_write_setup(struct l_dbus_message *message,
@@ -303,10 +304,87 @@ static void gatt_write_setup(struct l_dbus_message *message,
 	l_dbus_message_builder_leave_array(builder);
 	l_dbus_message_builder_enter_array(builder, "{sv}");
 	l_dbus_message_builder_enter_dict(builder, "sv");
+	if (req->type) {
+		l_dbus_message_builder_append_basic(builder, 's', "type");
+		l_dbus_message_builder_enter_variant(builder, "s");
+		l_dbus_message_builder_append_basic(builder, 's', req->type);
+		l_dbus_message_builder_leave_variant(builder);
+	}
 	l_dbus_message_builder_leave_dict(builder);
 	l_dbus_message_builder_leave_array(builder);
 	l_dbus_message_builder_finalize(builder);
 	l_dbus_message_builder_destroy(builder);
+}
+
+static void gatt_write_without_reply(struct l_dbus_proxy *proxy,
+						struct l_dbus_message *result,
+						void *user_data)
+{
+	struct gatt_write_req *req = user_data;
+	struct btp_adapter *adapter = req->adapter;
+
+	if (l_dbus_message_is_error(result)) {
+		const char *name, *desc;
+
+		l_dbus_message_get_error(result, &name, &desc);
+		l_error("Failed to write value (%s), %s", name, desc);
+
+		btp_send_error(btp, BTP_GATT_SERVICE, adapter->index,
+							BTP_ERROR_FAIL);
+		return;
+	}
+
+	btp_send(btp, BTP_GATT_SERVICE, BTP_OP_GATT_WRITE_WITHOUT_RSP,
+				adapter->index, 0, NULL);
+}
+
+static void btp_gatt_write_without_rsp(uint8_t index, const void *param,
+					uint16_t length, void *user_data)
+{
+	struct btp_adapter *adapter = find_adapter_by_index(index);
+	struct btp_device *device;
+	const struct btp_gatt_write_cp *cp = param;
+	uint8_t status = BTP_ERROR_FAIL;
+	bool prop;
+	struct gatt_attribute *characteristic;
+	struct gatt_write_req *req;
+
+	if (!adapter) {
+		status = BTP_ERROR_INVALID_INDEX;
+		goto failed;
+	}
+
+	/* Adapter needs to be powered to be able to write to Handle */
+	if (!l_dbus_proxy_get_property(adapter->proxy, "Powered", "b",
+					&prop) || !prop) {
+		goto failed;
+	}
+
+	device = find_device_by_address(adapter, &cp->address,
+							cp->address_type);
+	if (!device)
+		goto failed;
+
+	characteristic = l_queue_find(device->characteristics,
+					match_attribute_handle,
+					L_UINT_TO_PTR(cp->handle - 1));
+	if (!characteristic)
+		goto failed;
+
+	req = l_new(struct gatt_write_req, 1);
+	req->adapter = adapter;
+	req->cp = cp;
+	req->type = "command";
+
+	l_dbus_proxy_method_call(characteristic->proxy, "WriteValue",
+					gatt_write_setup,
+					gatt_write_without_reply,
+					req, NULL);
+
+	return;
+
+failed:
+	btp_send_error(btp, BTP_GATT_SERVICE, index, status);
 }
 
 static void gatt_write_reply(struct l_dbus_proxy *proxy,
@@ -397,6 +475,9 @@ bool gatt_register_service(struct btp *btp_, struct l_dbus *dbus_,
 
 	btp_register(btp, BTP_GATT_SERVICE, BTP_OP_GATT_READ_UUID,
 					btp_gatt_read_uuid, NULL, NULL);
+
+	btp_register(btp, BTP_GATT_SERVICE, BTP_OP_GATT_WRITE_WITHOUT_RSP,
+					btp_gatt_write_without_rsp, NULL, NULL);
 
 	btp_register(btp, BTP_GATT_SERVICE, BTP_OP_GATT_WRITE,
 					btp_gatt_write, NULL, NULL);
