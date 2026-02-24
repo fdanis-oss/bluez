@@ -204,6 +204,19 @@ struct btp_device *find_device_by_proxy(struct l_dbus_proxy *proxy)
 	return NULL;
 }
 
+static bool match_dir(const void *entry, const void *data)
+{
+	const struct btp_ase *ase = entry;
+	uint8_t dir = L_PTR_TO_UINT(data);
+
+	return ase->dir == dir;
+}
+
+struct btp_ase *find_ase_by_dir(struct btp_device *device, uint8_t dir)
+{
+	return l_queue_find(device->ases, match_dir, L_UINT_TO_PTR(dir));
+}
+
 static bool match_device_service_path(const void *device, const void *path)
 {
 	const struct btp_device *dev = device;
@@ -559,6 +572,18 @@ static void proxy_added(struct l_dbus_proxy *proxy, void *user_data)
 
 		l_queue_push_tail(device->descriptors, attribute);
 	}
+
+	if (!strcmp(interface, "org.bluez.Media1")) {
+		struct btp_adapter *adapter;
+
+		adapter = find_adapter_by_path(path);
+		if (!adapter)
+			return;
+
+		adapter->media_proxy = proxy;
+
+		return;
+	}
 }
 
 static bool device_match_by_proxy(const void *a, const void *b)
@@ -627,6 +652,18 @@ static void proxy_removed(struct l_dbus_proxy *proxy, void *user_data)
 			return;
 
 		l_queue_remove(device->descriptors, proxy);
+	}
+
+	if (!strcmp(interface, "org.bluez.Media1")) {
+		struct btp_adapter *adapter;
+
+		adapter = find_adapter_by_path(path);
+		if (!adapter)
+			return;
+
+		adapter->media_proxy = NULL;
+
+		return;
 	}
 }
 

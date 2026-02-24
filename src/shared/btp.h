@@ -26,6 +26,7 @@
 #define BTP_GATT_SERVICE	2
 #define BTP_L2CAP_SERVICE	3
 #define BTP_MESH_NODE_SERVICE	4
+#define BTP_ASCS_SERVICE	13
 #define BTP_BAP_SERVICE		14
 
 struct btp_hdr {
@@ -416,6 +417,68 @@ struct btp_gatt_write_cp {
 
 struct btp_gatt_write_rp {
 	uint8_t att_response;
+} __packed;
+
+#define BTP_OP_ASCS_READ_SUPPORTED_COMMANDS	0x01
+
+#define BTP_OP_ASCS_CONFIGURE_CODEC		0x02
+struct btp_ascs_configure_codec_cp {
+	uint8_t address_type;
+	bdaddr_t address;
+	uint8_t ase_id;
+	uint8_t coding_format;
+	uint16_t vid;
+	uint16_t cid;
+	uint8_t cc_ltvs_len;
+	uint8_t cc_ltvs[0];
+} __packed;
+
+#define BTP_OP_ASCS_CONFIGURE_QOS		0x03
+struct btp_ascs_configure_qos_cp {
+	uint8_t address_type;
+	bdaddr_t address;
+	uint8_t ase_id;
+	uint8_t cig_id;
+	uint8_t cis_id;
+	uint8_t sdu_interval[3];
+	uint8_t framing;
+	uint16_t max_sdu;
+	uint8_t retransmission_num;
+	uint16_t max_transport_latency;
+	uint8_t presentation_delay[3];
+} __packed;
+
+#define BTP_OP_ASCS_ADD_ASE_TO_CIS		0x0a
+struct btp_ascs_add_ase_to_cis_cp {
+	uint8_t address_type;
+	bdaddr_t address;
+	uint8_t ase_id;
+	uint8_t cig_id;
+	uint8_t cis_id;
+} __packed;
+
+#define BTP_OP_ASCS_PRECONFIGURE_QOS		0x0b
+struct btp_ascs_preconfigure_qos_cp {
+	uint8_t cig_id;
+	uint8_t cis_id;
+	uint8_t sdu_interval[3];
+	uint8_t framing;
+	uint16_t max_sdu;
+	uint8_t retransmission_num;
+	uint16_t max_transport_latency;
+	uint8_t presentation_delay[3];
+} __packed;
+
+#define BTP_EV_ASCS_OPERATION_COMPLETED		0x80
+struct btp_ascs_operation_completed_ev {
+	uint8_t address_type;
+	bdaddr_t address;
+	uint8_t ase_id;
+	uint8_t opcode;
+	uint8_t status;
+
+	/* RFU */
+	uint8_t flags;
 } __packed;
 
 #define BTP_BAP_DIR_SINK			0x01
