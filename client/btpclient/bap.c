@@ -253,6 +253,8 @@ void bap_proxy_added(struct l_dbus_proxy *proxy, void *user_data)
 			ase->device = device;
 			ase->dir = BTP_BAP_DIR_SINK;
 			ase->uuid = uuid;
+			ase->cig_id = BT_ISO_QOS_GROUP_UNSET;
+			ase->cis_id = BT_ISO_QOS_STREAM_UNSET;
 			l_queue_push_tail(device->ases, ase);
 
 			l_dbus_proxy_method_call(proxy, "ReadValue",
@@ -268,6 +270,8 @@ void bap_proxy_added(struct l_dbus_proxy *proxy, void *user_data)
 			ase->device = device;
 			ase->dir = BTP_BAP_DIR_SOURCE;
 			ase->uuid = uuid;
+			ase->cig_id = BT_ISO_QOS_GROUP_UNSET;
+			ase->cis_id = BT_ISO_QOS_STREAM_UNSET;
 			l_queue_push_tail(device->ases, ase);
 
 			l_dbus_proxy_method_call(proxy, "ReadValue",
