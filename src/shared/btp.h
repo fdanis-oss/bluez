@@ -26,6 +26,7 @@
 #define BTP_GATT_SERVICE	2
 #define BTP_L2CAP_SERVICE	3
 #define BTP_MESH_NODE_SERVICE	4
+#define BTP_ASCS_SERVICE	13
 #define BTP_BAP_SERVICE		14
 
 struct btp_hdr {
@@ -423,6 +424,45 @@ struct btp_gatt_write_cp {
 
 struct btp_gatt_write_rp {
 	uint8_t att_response;
+} __packed;
+
+#define BTP_OP_ASCS_READ_SUPPORTED_COMMANDS	0x01
+
+#define BTP_OP_ASCS_CONFIGURE_CODEC		0x02
+struct btp_ascs_configure_codec_cp {
+	uint8_t address_type;
+	bdaddr_t address;
+	uint8_t ase_id;
+	uint8_t coding_format;
+	uint16_t vid;
+	uint16_t cid;
+	uint8_t cc_ltvs_len;
+	uint8_t cc_ltvs[];
+} __packed;
+
+#define BTP_OP_ASCS_SETUP			0x0c
+struct btp_ascs_setup_cp {
+	uint8_t target_latency;
+} __packed;
+
+#define BTP_EV_ASCS_OPERATION_COMPLETED		0x80
+struct btp_ascs_operation_completed_ev {
+	uint8_t address_type;
+	bdaddr_t address;
+	uint8_t ase_id;
+	uint8_t opcode;
+	uint8_t status;
+
+	/* RFU */
+	uint8_t flags;
+} __packed;
+
+#define BTP_EV_ASCS_ASE_STATE_CHANGED		0x82
+struct btp_ascs_ase_state_changed_ev {
+	uint8_t address_type;
+	bdaddr_t address;
+	uint8_t ase_id;
+	uint8_t state;
 } __packed;
 
 #define BTP_BAP_DIR_SINK			0x01
