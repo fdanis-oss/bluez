@@ -96,16 +96,21 @@ static void btp_ascs_read_commands(uint8_t index, const void *param,
 			BTP_INDEX_NON_CONTROLLER, sizeof(commands), &commands);
 }
 
+struct register_ep_req {
+	uint uuid;
+	uint32_t locations;
+};
+
 static void ascs_register_endpoint_setup(struct l_dbus_message *message,
 							void *user_data)
 {
-	uint uuid = L_PTR_TO_UINT(user_data);
+	struct register_ep_req *req = user_data;
 	struct l_dbus_message_builder *builder;
 	const char *path, *uuid_str;
 	uint8_t *capa;
 	unsigned int capa_size, val, i;
 
-	if (uuid == PAC_SOURCE_CHRC_UUID) {
+	if (req->uuid == PAC_SOURCE_CHRC_UUID) {
 		path = BAP_SOURCE_PATH;
 		uuid_str = PAC_SOURCE_UUID;
 		capa = source_capa;
@@ -151,8 +156,7 @@ static void ascs_register_endpoint_setup(struct l_dbus_message *message,
 	l_dbus_message_builder_enter_dict(builder, "sv");
 	l_dbus_message_builder_append_basic(builder, 's', "Locations");
 	l_dbus_message_builder_enter_variant(builder, "u");
-	val = 1;
-	l_dbus_message_builder_append_basic(builder, 'u', &val);
+	l_dbus_message_builder_append_basic(builder, 'u', &req->locations);
 	l_dbus_message_builder_leave_variant(builder);
 	l_dbus_message_builder_leave_dict(builder);
 
@@ -182,10 +186,10 @@ static void ascs_register_endpoint_reply(struct l_dbus_proxy *proxy,
 						struct l_dbus_message *result,
 						void *user_data)
 {
-	uint uuid = L_PTR_TO_UINT(user_data);
+	struct register_ep_req *req = user_data;
 	const char *path;
 
-	if (uuid == PAC_SOURCE_CHRC_UUID)
+	if (req->uuid == PAC_SOURCE_CHRC_UUID)
 		path = BAP_SOURCE_PATH;
 	else
 		path = BAP_SINK_PATH;
@@ -245,14 +249,16 @@ failed:
 
 static bool register_endpoint(struct btp_adapter *adapter, struct btp_ase *ase)
 {
-	uint16_t uuid;
+	struct register_ep_req *req;
 	const char *path;
 
+	req = l_new(struct register_ep_req, 1);
+	req->locations = adapter->source_locations;
 	if (bt_uuid16_cmp(&ase->uuid, ASE_SINK_UUID)) {
-		uuid = PAC_SOURCE_CHRC_UUID;
+		req->uuid = PAC_SOURCE_CHRC_UUID;
 		path = BAP_SOURCE_PATH;
 	} else {
-		uuid = PAC_SINK_CHRC_UUID;
+		req->uuid = PAC_SINK_CHRC_UUID;
 		path = BAP_SINK_PATH;
 	}
 
@@ -273,7 +279,7 @@ static bool register_endpoint(struct btp_adapter *adapter, struct btp_ase *ase)
 			"RegisterEndpoint",
 			ascs_register_endpoint_setup,
 			ascs_register_endpoint_reply,
-			L_UINT_TO_PTR(uuid), NULL);
+			req, l_free);
 
 	return true;
 }
