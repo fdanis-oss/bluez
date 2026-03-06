@@ -87,6 +87,7 @@ static void btp_ascs_read_commands(uint8_t index, const void *param,
 	commands |= (1 << BTP_OP_ASCS_READ_SUPPORTED_COMMANDS);
 	commands |= (1 << BTP_OP_ASCS_CONFIGURE_CODEC);
 	commands |= (1 << BTP_OP_ASCS_CONFIGURE_QOS);
+	commands |= (1 << BTP_OP_ASCS_ENABLE);
 	commands |= (1 << BTP_OP_ASCS_ADD_ASE_TO_CIS);
 	commands |= (1 << BTP_OP_ASCS_PRECONFIGURE_QOS);
 
@@ -348,6 +349,27 @@ failed:
 	btp_send_error(btp, BTP_ASCS_SERVICE, index, status);
 }
 
+static void btp_ascs_enable(uint8_t index, const void *param,
+					uint16_t length, void *user_data)
+{
+	struct btp_adapter *adapter = find_adapter_by_index(index);
+	const struct btp_ascs_enable_cp *cp = param;
+	struct btp_ascs_operation_completed_ev ev;
+
+	/* Nothing to do */
+	btp_send(btp, BTP_ASCS_SERVICE, BTP_OP_ASCS_ENABLE, index, 0, NULL);
+
+	memcpy(&ev.address, &cp->address, sizeof(ev.address));
+	ev.address_type = cp->address_type;
+	ev.ase_id = cp->ase_id;
+	ev.opcode = 0;
+	ev.status = 0;
+	ev.flags = 0;
+
+	btp_send(btp, BTP_ASCS_SERVICE, BTP_EV_ASCS_OPERATION_COMPLETED,
+			adapter->index, sizeof(ev), &ev);
+}
+
 static void btp_ascs_add_ase_to_cis(uint8_t index, const void *param,
 					uint16_t length, void *user_data)
 {
@@ -603,6 +625,9 @@ bool ascs_register_service(struct btp *btp_, struct l_dbus *dbus_,
 
 	btp_register(btp, BTP_ASCS_SERVICE, BTP_OP_ASCS_CONFIGURE_QOS,
 					btp_ascs_configure_qos, NULL, NULL);
+
+	btp_register(btp, BTP_ASCS_SERVICE, BTP_OP_ASCS_ENABLE,
+					btp_ascs_enable, NULL, NULL);
 
 	btp_register(btp, BTP_ASCS_SERVICE, BTP_OP_ASCS_ADD_ASE_TO_CIS,
 					btp_ascs_add_ase_to_cis, NULL, NULL);

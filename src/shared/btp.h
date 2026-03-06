@@ -457,6 +457,13 @@ struct btp_ascs_configure_qos_cp {
 	uint8_t presentation_delay[3];
 } __packed;
 
+#define BTP_OP_ASCS_ENABLE			0x04
+struct btp_ascs_enable_cp {
+	uint8_t address_type;
+	bdaddr_t address;
+	uint8_t ase_id;
+} __packed;
+
 #define BTP_OP_ASCS_ADD_ASE_TO_CIS		0x0a
 struct btp_ascs_add_ase_to_cis_cp {
 	uint8_t address_type;
