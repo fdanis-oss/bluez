@@ -49,6 +49,10 @@ struct btp_ase {
 	uint8_t ase_id;
 	uint8_t cig_id;
 	uint8_t cis_id;
+	struct l_dbus_proxy *transport_proxy;
+	struct l_io *io;
+	uint16_t rx_mtu;
+	uint16_t tx_mtu;
 };
 
 struct btp_agent {

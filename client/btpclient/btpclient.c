@@ -25,6 +25,7 @@
 #include "bluetooth/uuid.h"
 #include "src/shared/btp.h"
 #include "btpclient.h"
+#include "ascs.h"
 #include "bap.h"
 #include "core.h"
 #include "gap.h"
@@ -584,6 +585,33 @@ static void proxy_added(struct l_dbus_proxy *proxy, void *user_data)
 
 		return;
 	}
+
+	if (!strcmp(interface, "org.bluez.MediaTransport1")) {
+		char *str;
+		struct btp_device *device;
+		uint8_t dir;
+		struct btp_ase *ase;
+
+		if (!l_dbus_proxy_get_property(proxy, "Device", "o", &str))
+			return;
+
+		device = find_device_by_path(str);
+		if (!device)
+			return;
+
+		if (!l_dbus_proxy_get_property(proxy, "UUID", "s", &str))
+			return;
+
+		if (!bt_uuid_strcmp(str, PAC_SINK_UUID))
+			dir = BTP_BAP_DIR_SOURCE;
+		else
+			dir = BTP_BAP_DIR_SINK;
+		ase = find_ase_by_dir(device, dir);
+		if (!ase)
+			return;
+
+		ase->transport_proxy = proxy;
+	}
 }
 
 static bool device_match_by_proxy(const void *a, const void *b)
@@ -670,8 +698,16 @@ static void proxy_removed(struct l_dbus_proxy *proxy, void *user_data)
 static void property_changed(struct l_dbus_proxy *proxy, const char *name,
 				struct l_dbus_message *msg, void *user_data)
 {
+	const char *interface = l_dbus_proxy_get_interface(proxy);
+	const char *path = l_dbus_proxy_get_path(proxy);
+
+	l_info("Property changed: %s %s %s", name, path, interface);
+
 	if (gap_is_service_registered())
 		gap_property_changed(proxy, name, msg, user_data);
+
+	if (ascs_is_service_registered())
+		ascs_property_changed(proxy, name, msg, user_data);
 }
 
 static void client_connected(struct l_dbus *dbus, void *user_data)
