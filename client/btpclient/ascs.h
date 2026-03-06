@@ -11,3 +11,6 @@ bool ascs_register_service(struct btp *btp_, struct l_dbus *dbus_,
 					struct l_dbus_client *client);
 void ascs_unregister_service(struct btp *btp);
 bool ascs_is_service_registered();
+
+void ascs_property_changed(struct l_dbus_proxy *proxy, const char *name,
+				struct l_dbus_message *msg, void *user_data);

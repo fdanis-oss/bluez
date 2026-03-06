@@ -464,6 +464,13 @@ struct btp_ascs_enable_cp {
 	uint8_t ase_id;
 } __packed;
 
+#define BTP_OP_ASCS_RECEIVER_START_READY	0x05
+struct btp_ascs_receiver_start_ready_cp {
+	uint8_t address_type;
+	bdaddr_t address;
+	uint8_t ase_id;
+} __packed;
+
 #define BTP_OP_ASCS_ADD_ASE_TO_CIS		0x0a
 struct btp_ascs_add_ase_to_cis_cp {
 	uint8_t address_type;
@@ -495,6 +502,22 @@ struct btp_ascs_operation_completed_ev {
 
 	/* RFU */
 	uint8_t flags;
+} __packed;
+
+#define BTP_EV_ASCS_ASE_STATE_CHANGED		0x82
+struct btp_ascs_ase_state_changed_ev {
+	uint8_t address_type;
+	bdaddr_t address;
+	uint8_t ase_id;
+	uint8_t state;
+} __packed;
+
+#define BTP_EV_ASCS_CIS_CONNECTED		0x83
+struct btp_ascs_cis_connected_ev {
+	uint8_t address_type;
+	bdaddr_t address;
+	uint8_t ase_id;
+	uint8_t cis_id;
 } __packed;
 
 #define BTP_BAP_DIR_SINK			0x01
@@ -533,6 +556,15 @@ struct btp_bap_ase_found_ev {
 	bdaddr_t address;
 	uint8_t dir;
 	uint8_t ase_id;
+} __packed;
+
+#define BTP_EV_BAP_STREAM_RECEIVED		0x83
+struct btp_bap_stream_received_ev {
+	uint8_t address_type;
+	bdaddr_t address;
+	uint8_t ase_id;
+	uint8_t data_len;
+	uint8_t data[];
 } __packed;
 
 struct btp;
