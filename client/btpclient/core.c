@@ -18,6 +18,7 @@
 #include "core.h"
 #include "gap.h"
 #include "gatt.h"
+#include "pacs.h"
 
 static struct btp *btp;
 static struct l_dbus *dbus;
@@ -92,6 +93,14 @@ static void btp_core_register(uint8_t index, const void *param,
 			goto failed;
 
 		break;
+	case BTP_PACS_SERVICE:
+		if (pacs_is_service_registered())
+			goto failed;
+
+		if (!pacs_register_service(btp, dbus, client))
+			goto failed;
+
+		break;
 	case BTP_ASCS_SERVICE:
 		if (ascs_is_service_registered())
 			goto failed;
@@ -149,6 +158,12 @@ static void btp_core_unregister(uint8_t index, const void *param,
 			goto failed;
 
 		gatt_unregister_service(btp);
+		break;
+	case BTP_PACS_SERVICE:
+		if (!pacs_is_service_registered())
+			goto failed;
+
+		ascs_unregister_service(btp);
 		break;
 	case BTP_ASCS_SERVICE:
 		if (!ascs_is_service_registered())
