@@ -234,9 +234,22 @@ static void set_connect_next(struct btd_device_set *set)
 					entry = entry->next) {
 		struct btd_device *device = entry->data;
 
-		/* Only connect one at time(?) */
-		if (!device_connect_le(device))
-			return;
+		if (btd_device_is_connected(device))
+			continue;
+
+		/*
+		 * Other set members may advertise with a rotating RPA and
+		 * only become connectable intermittently, so a direct LE
+		 * connect (device_connect_le()) can occupy the controller's
+		 * single LE connection attempt for the duration of its
+		 * directed-connect timeout without ever resolving. Rely
+		 * instead on the accept-list/background connection
+		 * mechanism, which lets the controller resolve the RPA and
+		 * connect autonomously as soon as the device is seen, and
+		 * allows all pending set members to be queued at once
+		 * instead of serializing on a single direct connect.
+		 */
+		device_set_auto_connect(device, TRUE);
 	}
 }
 
@@ -296,7 +309,16 @@ static void foreach_rsi(void *data, void *user_data)
 					btd_device_get_gatt_db(device));
 	}
 
-	device_connect_le(set->device);
+	/*
+	 * Use the accept-list/background connection path rather than a
+	 * direct LE connect: the RSI advertisement is observed repeatedly
+	 * while the device uses a rotating RPA, and firing a fresh direct
+	 * connect on every match would repeatedly steal the controller's
+	 * single LE connection attempt (needed for the directed-connect
+	 * timeout) from the background connect that would otherwise
+	 * succeed once the controller resolves the RPA.
+	 */
+	device_set_auto_connect(set->device, TRUE);
 }
 
 static void foreach_device(struct btd_device *device, void *data)

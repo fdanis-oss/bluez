@@ -2264,7 +2264,7 @@ bool btd_device_add_set(struct btd_device *device, bool encrypted,
 	return true;
 }
 
-static void device_set_auto_connect(struct btd_device *device, gboolean enable)
+void device_set_auto_connect(struct btd_device *device, gboolean enable)
 {
 	char addr[18];
 	const char *bearer;
@@ -2729,7 +2729,25 @@ int btd_device_connect_services(struct btd_device *dev, GSList *services)
 		if (dev->le_state.connected)
 			return -EALREADY;
 
-		return device_connect_le(dev);
+		/*
+		 * This path is only used for automatic/background
+		 * reconnection (e.g. plugins/policy.c grace and reconnect
+		 * timers), not for an explicit Device1.Connect request. If a
+		 * direct connect (or the background/accept-list connect
+		 * mechanism, including the kernel's own scan-then-connect
+		 * handling of RPA devices) is already in flight, issuing
+		 * another direct connect here would race with it for the
+		 * controller's single LE connection attempt, repeatedly
+		 * cancelling and restarting it and starving reconnection
+		 * indefinitely. Instead just make sure the device is armed
+		 * for background auto-connect and let that finish the job.
+		 */
+		if (dev->auto_connect || dev->att_io)
+			return 0;
+
+		device_set_auto_connect(dev, TRUE);
+
+		return 0;
 	}
 
 	if (!dev->bredr_state.svc_resolved) {
